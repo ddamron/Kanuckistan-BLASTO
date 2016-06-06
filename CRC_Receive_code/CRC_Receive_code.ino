@@ -91,7 +91,7 @@ void setup() {
  
  
   digitalWrite(triggerPin, HIGH);      // Not really needed if your circuit has the correct pull up resistors already but doesn't harm
-  
+  Serial.println(F_CPU);
   Serial.println("Ready....");
 }
 
@@ -99,7 +99,7 @@ void setup() {
 // Main loop most of the code is in the sub routines
 void loop(){
   //Serial.print(".");
-  receiveIR();
+  receiveIR(IRreceivePin);
   //triggers();
 }
 
@@ -107,17 +107,14 @@ void loop(){
 // SUB ROUTINES
 
 
-
-
-void receiveIR() { // Void checks for an incoming signal and decodes it if it sees one.
+void receiveIR(int pin) { // Void checks for an incoming signal and decodes it if it sees one.
   int error = 0;
 
-  if (digitalRead(IRreceivePin) == LOW) { // check to see if it's low
+  if (digitalRead(pin) == LOW) { // check to see if it's low
      
-    while(digitalRead(IRreceivePin) == LOW){}             //wait for it to go high again 
+    while(digitalRead(pin) == LOW)             //wait for it to go high again 
     for(int i = 1; i <= 15; i++) {                        // Repeats several times to make sure the whole signal has been received
-//      received[i] = pulseIn(IRreceivePin, LOW, timeOut);  // pulseIn command waits for a pulse and then records its duration in microseconds.
-      received[i] = pulseIn(IRreceivePin, LOW, 10000);  // pulseIn command waits for a pulse and then records its duration in microseconds.
+      received[i] = pulseIn(pin, LOW, 10000);  // pulseIn command waits for a pulse and then records its duration in microseconds.
     }
    
     Serial.print("raw: ");                            // Prints if it was a head shot or not.
@@ -133,7 +130,7 @@ void receiveIR() { // Void checks for an incoming signal and decodes it if it se
       receivedTemp[i] = 2;
       if(received[i] > (IRpulse - 200) &&  received[i] < (IRpulse + 200)) {receivedTemp[i] = 0;}                      // Works out from the pulse length if it was a data 1 or 0 that was received writes result to receivedTemp string
       if(received[i] > (IRpulse + IRpulse - 200) &&  received[i] < (IRpulse + IRpulse + 200)) {receivedTemp[i] = 1;}  // Works out from the pulse length if it was a data 1 or 0 that was received  
-      received[i] = 3;                   // Wipes raw received data
+      //received[i] = 3;                   // Wipes raw received data
       received[i] = receivedTemp[i];     // Inputs interpreted data
      
       Serial.print(" ");
@@ -143,14 +140,14 @@ void receiveIR() { // Void checks for an incoming signal and decodes it if it se
     
     // Parity Check. Was the data received a valid signal?
     check = 0;
-    for(int i = 1; i <= 16; i++) {
+    for(int i = 1; i <= 15; i++) {
       if(received[i] == 1){check = check + 1;}
       if(received[i] == 2){error = 1;}
     }
     // Serial.println(check);
     check = check >> 0 & B1;
     // Serial.println(check);
-    if(check != received[17]){error = 1;}
+    if(check != received[15]){error = 1;}
     if(error == 0){Serial.println("Valid Signal");}
     else{Serial.println("ERROR");}
     if(error == 0){interpritReceived();}
