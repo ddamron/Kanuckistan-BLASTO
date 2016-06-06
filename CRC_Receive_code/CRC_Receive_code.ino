@@ -111,19 +111,24 @@ void loop(){
 
 void receiveIR() { // Void checks for an incoming signal and decodes it if it sees one.
   int error = 0;
- 
-   
-  while(digitalRead(IRreceivePin) == LOW){
-  
-    for(int i = 1; i <= 17; i++) {                        // Repeats several times to make sure the whole signal has been received
-      received[i] = pulseIn(IRreceivePin, LOW, timeOut);  // pulseIn command waits for a pulse and then records its duration in microseconds.
+
+  if (digitalRead(IRreceivePin) == LOW) { // check to see if it's low
+     
+    while(digitalRead(IRreceivePin) == LOW){}             //wait for it to go high again 
+    for(int i = 1; i <= 15; i++) {                        // Repeats several times to make sure the whole signal has been received
+//      received[i] = pulseIn(IRreceivePin, LOW, timeOut);  // pulseIn command waits for a pulse and then records its duration in microseconds.
+      received[i] = pulseIn(IRreceivePin, LOW, 10000);  // pulseIn command waits for a pulse and then records its duration in microseconds.
     }
    
-    Serial.print("sensor: ");                            // Prints if it was a head shot or not.
-    Serial.print(received[0]); 
-    Serial.print("...");
+    Serial.print("raw: ");                            // Prints if it was a head shot or not.
+    for(int i = 1; i <= 15; i++) {                        // Repeats several times to make sure the whole signal has been received
+      Serial.print(received[i]);  // pulseIn command waits for a pulse and then records its duration in microseconds.
+      Serial.print(":");
+    }
+    Serial.println();
+  
    
-    for(int i = 1; i <= 17; i++) {  // Looks at each one of the received pulses
+    for(int i = 1; i <= 15; i++) {  // Looks at each one of the received pulses
       int receivedTemp[18];
       receivedTemp[i] = 2;
       if(received[i] > (IRpulse - 200) &&  received[i] < (IRpulse + 200)) {receivedTemp[i] = 0;}                      // Works out from the pulse length if it was a data 1 or 0 that was received writes result to receivedTemp string
@@ -135,7 +140,7 @@ void receiveIR() { // Void checks for an incoming signal and decodes it if it se
       Serial.print(received[i]);         // Print interpreted data results
     }
     Serial.println("");                  // New line to tidy up printed results
-   
+    
     // Parity Check. Was the data received a valid signal?
     check = 0;
     for(int i = 1; i <= 16; i++) {
@@ -151,8 +156,8 @@ void receiveIR() { // Void checks for an incoming signal and decodes it if it se
     if(error == 0){interpritReceived();}
     //digitalWrite(hitPin,LOW);
   }
-
 }
+
 
 void interpritReceived(){  // After a message has been received by the ReceiveIR subroutine this subroutine decidedes how it should react to the data
   if(hitNo == memory){hitNo = 0;} // hitNo sorts out where the data should be stored if statement means old data gets overwritten if too much is received
@@ -269,9 +274,9 @@ void frequencyCalculations() { // Works out all the timings needed to give the c
 
   Serial.print("Oscilation time period /2: ");
   Serial.println(IRt);
-  Serial.print("Pulses: ");
+  Serial.print("IRPulses: ");
   Serial.println(IRpulses);
-  timeOut = IRpulse + 50; // Adding 50 to the expected pulse time gives a little margin for error on the pulse read time out value
+  timeOut = IRpulse + 100; // Adding 50 to the expected pulse time gives a little margin for error on the pulse read time out value
 }
 
 
