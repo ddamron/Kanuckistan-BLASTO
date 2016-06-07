@@ -1,0 +1,37 @@
+Output: Gerber Files
+Type  : Gerber
+From  : Variant [[No Variations]] of Project [BLASTO v2 Target.PrjPcb]
+   Generated File[Target Board SMT Double Sided.GTL]
+   Generated File[Target Board SMT Double Sided.GBL]
+   Generated File[Target Board SMT Double Sided.GPB]
+   Generated File[Target Board SMT Double Sided.GPT]
+   Generated File[Target Board SMT Double Sided.GTO]
+   Generated File[Target Board SMT Double Sided.GTP]
+   Generated File[Target Board SMT Double Sided.GTS]
+   Generated File[Target Board SMT Double Sided.GBS]
+   Generated File[Target Board SMT Double Sided.GBP]
+   Generated File[Target Board SMT Double Sided.GBO]
+   Generated File[Target Board SMT Double Sided.GKO]
+   Generated File[Target Board SMT Double Sided.Outline]
+   Generated File[Target Board SMT Double Sided.Dimensions]
+   Generated File[Target Board SMT Double Sided.Assembly Text Top]
+   Generated File[Target Board SMT Double Sided.Assembly Text Bottom]
+   Generated File[Target Board SMT Double Sided.Assembly Top]
+   Generated File[Target Board SMT Double Sided.Assembly Bottom]
+   Generated File[Target Board SMT Double Sided.Dimensions Top]
+   Generated File[Target Board SMT Double Sided.Dimensions Bottom]
+   Generated File[Target Board SMT Double Sided.3D Top]
+   Generated File[Target Board SMT Double Sided.3D Bottom]
+   Generated File[Target Board SMT Double Sided.Courtyard Top]
+   Generated File[Target Board SMT Double Sided.Courtyard Bottom]
+   Generated File[Target Board SMT Double Sided.Test Points Top]
+   Generated File[Target Board SMT Double Sided.Test Points Bottom]
+   Generated File[Target Board SMT Double Sided.RUL]
+   Generated File[Target Board SMT Double Sided.EXTREP]
+   Generated File[Target Board SMT Double Sided.REP]
+
+
+Files Generated   : 28
+Documents Printed : 0
+
+Finished Output Generation At 10:14:14 AM On 5/11/2016
