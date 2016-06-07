@@ -20,7 +20,7 @@
 // Digital IO's
 int triggerPin             = 3;      // Push button for primary fire. Low = pressed
 int IRtransmitPin          = 2;      // Primary fire mode IR transmitter pin: Use pins 2,4,7,8,12 or 13. DO NOT USE PWM pins!! More info: http://j44industries.blogspot.com/2009/09/arduino-frequency-generation.html#more
-int IRreceivePin           = 12;     // The pin that incoming IR signals are read from
+int IRreceivePin           = A0;     // The pin that incoming IR signals are read from
 // Minimum gun requirements: trigger, receiver, IR led, hit LED.
 
 // Player and Game details
@@ -86,8 +86,8 @@ void setup() {
   pinMode(IRreceivePin, INPUT_PULLUP);
  
   frequencyCalculations();   // Calculates pulse lengths etc for desired frequency
-  configureGame();           // Look up and configure game details
-  tagCode();                 // Based on game details etc works out the data that will be transmitted when a shot is fired
+  //configureGame();           // Look up and configure game details
+  //tagCode();                 // Based on game details etc works out the data that will be transmitted when a shot is fired
  
  
   digitalWrite(triggerPin, HIGH);      // Not really needed if your circuit has the correct pull up resistors already but doesn't harm
@@ -114,7 +114,7 @@ void receiveIR(int pin) { // Void checks for an incoming signal and decodes it i
      
     while(digitalRead(pin) == LOW)             //wait for it to go high again 
     for(int i = 1; i <= 15; i++) {                        // Repeats several times to make sure the whole signal has been received
-      received[i] = pulseIn(pin, LOW, 10000);  // pulseIn command waits for a pulse and then records its duration in microseconds.
+      received[i] = pulseIn(pin, LOW, 5000);  // pulseIn command waits for a pulse and then records its duration in microseconds.
     }
    
     Serial.print("raw: ");                            // Prints if it was a head shot or not.
