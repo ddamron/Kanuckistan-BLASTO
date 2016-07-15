@@ -31,8 +31,8 @@ IRrecv irrx(IRRXPIN);
 // Gun definitions here..
 uint8_t safety = ON;
 int timeron = 0;
-long timerstart;
-int timerlength;
+unsigned long timerstart;
+unsigned long timerlength;
 CRGB fgcolor, bgcolor;
 
 
@@ -53,16 +53,23 @@ void setup() {
   #endif
 }
 void color_wipe(int fgpercent) {
+  //Serial.println("Inside Color_wipe");
+  Serial.print("Percent = ");
+  Serial.println(fgpercent);
   int i;
-  int fgleds = (fgpercent * NUM_LEDS) / 100;
-  for (i = 0; i < (NUM_LEDS - fgleds); i++) {
+  int fgleds = (fgpercent * NUM_LEDS) / 100; // calculation of # of leds using fgcolor
+  int blackleds = NUM_LEDS - fgleds;  // calculation of # of leds using bgcolor
+  Serial.print("FGleds:"); Serial.print(fgleds);
+  Serial.print("\tbgleds:"); Serial.println(blackleds);
+  for (i = 0; i < blackleds; i++) {
     leds[i] = bgcolor;
   }
-  for (i = fgleds; i < NUM_LEDS; i++) {
+  for (i = blackleds; i < NUM_LEDS; i++) {
     leds[i] = fgcolor;
   }
+  //Serial.println("Just before show");
   FastLED.show();
-  
+  //Serial.println("leaving color_wipe");
 }
 
 void activateTarget(CRGB color) {
@@ -79,6 +86,7 @@ void deactivateTarget() {
 }
 
 void color_timer(CRGB backcolor, CRGB forecolor, int timeout) {
+  //Serial.println("Inside color_timer");
   fgcolor = forecolor;
   bgcolor = backcolor;
   timerstart = millis();
@@ -86,32 +94,62 @@ void color_timer(CRGB backcolor, CRGB forecolor, int timeout) {
   timeron = 1;
   color_wipe(100);
   irrx.enableIRIn();
+  //Serial.println("End of color_timer");
 }
 
 void update_timer() {
-  long elapsedtime = millis() - timerstart;
+  //Serial.println("Inside update_timer");
+  unsigned long elapsedtime = millis() - timerstart;
   if (elapsedtime > timerlength) {  // end timer here
     timeron = 0;
     color_wipe(0);
     irrx.disableIRIn();
     //TODO: send packet to MC to indicate timer expired.
   } else {
-    int percent = timerlength / elapsedtime;
+    Serial.print("Timer Length:");Serial.print(timerlength);
+    Serial.print("\tElapsed Time:");Serial.print(elapsedtime);
+    int percent = (timerlength - elapsedtime)* 100 / timerlength;
+    Serial.print("Update_timer Percent:");Serial.println(percent);
     color_wipe(percent);
   }
-  
+//Serial.println("End of update_timer");
 }
 
 
 void loop() {
+  Serial.println("Begin of Loop");
   decode_results results;
   if (irrx.decode(&results)) {
     Serial.print("IR IN:");
     dumpRaw(&results);
     irrx.resume();
-    if (timeron) update_timer();
-    blast(-1);
   }
+  if (timeron) {
+    Serial.print("+");
+    update_timer();
+  } else  {
+    
+    Serial.println("Activating Color Timer!");
+    
+//    fgcolor = CRGB::Red;
+//    bgcolor = CRGB::Green;
+//    color_wipe(100);
+//    delay(1000);
+//    color_wipe(75);
+//    delay(1000);
+//    color_wipe(50);
+//    delay(1000);
+//    color_wipe(25);
+//    delay(1000);
+//    color_wipe(0);
+//    delay(1000);
+    safety = false;
+    blast(2);
+    delay(1000);
+    color_timer(CRGB::Blue, CRGB::Red, 1);
+    //Serial.println("End of loop");
+  }
+  blast(-1);
 }
 
 //+=============================================================================
@@ -186,7 +224,7 @@ void fire() {
   }
 }
 
-void blast(int timeout) {
+void blast(int timeout) { // function to blow flame
   static uint16_t blasttime;
   static long starttime ;
   if (!safety) { // check safety flag == off
