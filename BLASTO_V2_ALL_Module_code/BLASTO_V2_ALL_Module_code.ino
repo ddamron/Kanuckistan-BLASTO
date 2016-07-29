@@ -1,17 +1,21 @@
+#include <ESP8266WiFi.h>
 #include <IRremoteESP8266.h>
 #include <FastLED.h>
-
+#include "user_interface.h"
+// select mode..
 #define TARGET 1
 //#define GUN 1
 //#define BLASTER 1
 
+// Define max clients
+#define MAX_SRV_CLIENTS 1
 // hardware pins
 #define IRTXPIN 5
 #define IRRXPIN 4
 #define SOLENOID 13
 #define ON 1
 #define OFF 0
-
+#define TCPPORT 2016
 // LEDS
 #ifdef TARGET
   #define LED_PIN 12
@@ -25,6 +29,14 @@
 #ifdef GUN
   #define TRIGGER 12
 #endif
+IPAddress messageTargetIP(192,168,2,2);
+const char* ssid = "BLASTO";
+const char* password = "Kanuckistan2016";
+char command[10]; // array to hold transmit message
+char response[10]; // array to hold recieve message
+
+WiFiServer server(2016);
+WiFiClient wificlient[MAX_SRV_CLIENTS];
 IRsend irtx(IRTXPIN);
 IRrecv irrx(IRRXPIN);
 
@@ -35,11 +47,24 @@ unsigned long timerstart;
 unsigned long timerlength;
 CRGB fgcolor, bgcolor;
 
-
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  Serial.print("\nConnecting to "); Serial.println(ssid);
+  uint8_t i = 0;
+  while (WiFi.status() != WL_CONNECTED && i++ < 20) delay(500);
+  if (i == 21) {
+    Serial.print("Could not connect to"); Serial.println(ssid);
+    while(1) delay(500);
+  }
+  server.begin();
+  server.setNoDelay(true);
+  Serial1.print("Ready! Use 'telnet ");
+  Serial1.print(WiFi.localIP());
+  Serial1.println(" 23' to connect");
   pinMode(SOLENOID, OUTPUT);
+  
   #ifdef GUN
     irtx.begin();
     irrx.enableIRIn(); // enable receive on IR
@@ -117,7 +142,29 @@ void update_timer() {
 
 
 void loop() {
+  int i;
   Serial.println("Begin of Loop");
+
+  if (server.hasClient()){
+    for(i = 0; i < MAX_SRV_CLIENTS; i++){
+      //find free/disconnected spot
+      if (!wificlient[i] || !wificlient[i].connected()){
+        if(wificlient[i]) wificlient[i].stop();
+        wificlient[i] = server.available();
+        Serial1.print("New client: "); Serial1.print(i);
+        continue;
+        // receive data here
+        String receiveddata = wificlient[i].readStringUntil('\r');
+        // process receiveddata here
+      }
+    }
+    //no free/disconnected spot so reject
+    WiFiClient serverClient = server.available();
+    serverClient.stop();
+  }
+
+
+  
   decode_results results;
   if (irrx.decode(&results)) {
     Serial.print("IR IN:");
@@ -151,6 +198,35 @@ void loop() {
   }
   blast(-1);
 }
+
+void sendCommand(IPAddress target, char* command)
+{
+  if (!wificlient[0].connect(target, TCPPORT)) {
+    Serial.print("Connection Failed");
+    return;
+  }
+  Serial.print("Connected in sendCommand");
+   // create URI
+   String url = String(system_get_chip_id(), HEX) + ":" + str(command) + "\r";
+   // send request to server
+   Serial.println();
+   wificlient[0].print(url);
+   unsigned timeout = millis();
+   while (wificlient[0].available() == 0) {
+     if (millis() == timeout > 5000) {
+       Serial.println("Client Timeout!");
+       wificlient[0].stop();
+       return;
+     }
+   }
+   // read all data back
+   while (wificlient[0].available()) {
+    String received = wificlient[0].readStringUntil('\r');
+    Serial.print(received);
+    wificlient[0].stop();
+   }
+}
+
 
 //+=============================================================================
 // Display encoding type
