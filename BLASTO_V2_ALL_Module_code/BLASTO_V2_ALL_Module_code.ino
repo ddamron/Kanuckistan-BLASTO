@@ -1,14 +1,25 @@
+/*
+ * BLASTO V2
+ * 
+ */
+
+
+
 #include <ESP8266WiFi.h>
 #include <IRremoteESP8266.h>
 #include <FastLED.h>
+#ifdef ESP8266
+extern "C" {
 #include "user_interface.h"
+}
+#endif
 // select mode..
-#define TARGET 1
-//#define GUN 1
+//#define TARGET 1
+#define GUN 1
 //#define BLASTER 1
 
 // Define max clients
-#define MAX_SRV_CLIENTS 1
+#define MAX_SRV_CLIENTS 10
 // hardware pins
 #define IRTXPIN 5
 #define IRRXPIN 4
@@ -16,18 +27,21 @@
 #define ON 1
 #define OFF 0
 #define TCPPORT 2016
-// LEDS
+
+
 #ifdef TARGET
-  #define LED_PIN 12
-  #define NUM_LEDS 24
-  #define BRIGHTNESS 64
-  #define LED_TYPE WS2811
-  #define COLOR_ORDER GRB
-  CRGB leds[NUM_LEDS];
+// LEDS
+#define LED_PIN 12
+#define NUM_LEDS 24
+#define BRIGHTNESS 64
+#define LED_TYPE WS2811
+#define COLOR_ORDER GRB
+CRGB leds[NUM_LEDS];
+
 #endif
 
 #ifdef GUN
-  #define TRIGGER 12
+  #define TRIGGER 4 // IR rx pin
 #endif
 IPAddress messageTargetIP(192,168,2,2);
 const char* ssid = "BLASTO";
@@ -48,24 +62,10 @@ unsigned long timerlength;
 CRGB fgcolor, bgcolor;
 
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  Serial.print("\nConnecting to "); Serial.println(ssid);
-  uint8_t i = 0;
-  while (WiFi.status() != WL_CONNECTED && i++ < 20) delay(500);
-  if (i == 21) {
-    Serial.print("Could not connect to"); Serial.println(ssid);
-    while(1) delay(500);
-  }
-  server.begin();
-  server.setNoDelay(true);
-  Serial1.print("Ready! Use 'telnet ");
-  Serial1.print(WiFi.localIP());
-  Serial1.println(" 23' to connect");
-  pinMode(SOLENOID, OUTPUT);
-  
   #ifdef GUN
+    pinMode(TRIGGER, INPUT_PULLUP); // led data pin wired to switch to GND.
+    pinMode(SOLENOID, OUTPUT); // define solenoid as output possibly for vibration motor kickback
+    digitalWrite(SOLENOID, 0); // and make false
     irtx.begin();
     irrx.enableIRIn(); // enable receive on IR
   #endif
@@ -75,17 +75,43 @@ void setup() {
     irrx.enableIRIn();
   #endif
   #ifdef BLASTER
+    pinMode(SOLENOID, OUTPUT);
+  
   #endif
+  String chipID = String(system_get_chip_id(), HEX);
+
+  
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  Serial.print("\nConnecting to "); Serial.println(ssid);
+  uint8_t i = 0;
+  while (WiFi.status() != WL_CONNECTED && i++ < 20) delay(500);
+  if (i == 21) {
+    Serial.print("Could not connect to "); Serial.println(ssid);
+    while(1) delay(500);
+  }
+  Serial.println("WiFi connected");  
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  server.begin();
+  server.setNoDelay(true);
+  Serial1.print("Ready! Use 'telnet ");
+  Serial1.print(WiFi.localIP());
+  Serial1.println(" 2016' to connect");
+  
 }
+
+#ifdef TARGET
+
 void color_wipe(int fgpercent) {
   //Serial.println("Inside Color_wipe");
-  Serial.print("Percent = ");
-  Serial.println(fgpercent);
+  //Serial.print("Percent = ");
+  //Serial.println(fgpercent);
   int i;
   int fgleds = (fgpercent * NUM_LEDS) / 100; // calculation of # of leds using fgcolor
   int blackleds = NUM_LEDS - fgleds;  // calculation of # of leds using bgcolor
-  Serial.print("FGleds:"); Serial.print(fgleds);
-  Serial.print("\tbgleds:"); Serial.println(blackleds);
+  //Serial.print("FGleds:"); Serial.print(fgleds);
+  //Serial.print("\tbgleds:"); Serial.println(blackleds);
   for (i = 0; i < blackleds; i++) {
     leds[i] = bgcolor;
   }
@@ -109,7 +135,6 @@ void deactivateTarget() {
   color_wipe(0);
   irrx.disableIRIn();
 }
-
 void color_timer(CRGB backcolor, CRGB forecolor, int timeout) {
   //Serial.println("Inside color_timer");
   fgcolor = forecolor;
@@ -131,19 +156,21 @@ void update_timer() {
     irrx.disableIRIn();
     //TODO: send packet to MC to indicate timer expired.
   } else {
-    Serial.print("Timer Length:");Serial.print(timerlength);
-    Serial.print("\tElapsed Time:");Serial.print(elapsedtime);
+    //Serial.print("Timer Length:");Serial.print(timerlength);
+    //Serial.print("\tElapsed Time:");Serial.print(elapsedtime);
     int percent = (timerlength - elapsedtime)* 100 / timerlength;
-    Serial.print("Update_timer Percent:");Serial.println(percent);
+    //Serial.print("Update_timer Percent:");Serial.println(percent);
     color_wipe(percent);
   }
 //Serial.println("End of update_timer");
 }
+#endif
+
 
 
 void loop() {
   int i;
-  Serial.println("Begin of Loop");
+  Serial.print(".");
 
   if (server.hasClient()){
     for(i = 0; i < MAX_SRV_CLIENTS; i++){
@@ -151,28 +178,48 @@ void loop() {
       if (!wificlient[i] || !wificlient[i].connected()){
         if(wificlient[i]) wificlient[i].stop();
         wificlient[i] = server.available();
-        Serial1.print("New client: "); Serial1.print(i);
+        Serial.print("\nNew client: "); Serial.println(i);
         continue;
         // receive data here
         String receiveddata = wificlient[i].readStringUntil('\r');
         // process receiveddata here
+        Serial.print("\nData:");
+        Serial.println(receiveddata);
       }
     }
     //no free/disconnected spot so reject
     WiFiClient serverClient = server.available();
     serverClient.stop();
+    Serial.println("No Free Clients - rejected");
   }
 
-
+#ifdef GUN
+  if (!digitalRead(TRIGGER)) {     // trigger pulled
+    Serial.println("\nTrigger pulled!");
+    digitalWrite(SOLENOID, true); // Turn on Vibe
+    delay(500);
+    digitalWrite(SOLENOID, false); // turn off Vibe
+    
+    // send IP Packet
+    // Send IR Pulse
+    
+  }
   
+#endif
+#ifdef TARGET
   decode_results results;
   if (irrx.decode(&results)) {
     Serial.print("IR IN:");
     dumpRaw(&results);
+    // validate results
+    // send IP Packet
+    // activate lights
+    // delay
+    
     irrx.resume();
   }
   if (timeron) {
-    Serial.print("+");
+    //Serial.print("+");
     update_timer();
   } else  {
     
@@ -197,6 +244,32 @@ void loop() {
     //Serial.println("End of loop");
   }
   blast(-1);
+
+#endif
+#ifdef BLASTER
+  /* 
+   *    wait for a IP packet
+   *    is packet disable?
+   *      yes - make non active
+   *      reset watchdog
+   *    is packet fire?
+   *      is active?
+   *        yes - fire
+   *        no - ignore
+   *        reset watchdog
+   *    is packet enable?
+   *      yes - enable blaster.
+   *      reset watchdog
+   *    check watchdog timer overflow
+   *      overflow?
+   *        yes - disable
+   *        no - ignore
+   *   
+   
+   */
+    
+#endif
+
 }
 
 void sendCommand(IPAddress target, char* command)
