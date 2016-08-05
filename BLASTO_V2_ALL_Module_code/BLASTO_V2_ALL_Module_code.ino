@@ -6,6 +6,7 @@
 
 
 #include <ESP8266WiFi.h>
+#include <WiFiUDP.h>
 #include <IRremoteESP8266.h>
 #include <FastLED.h>
 #ifdef ESP8266
@@ -30,46 +31,54 @@ extern "C" {
 
 
 #ifdef TARGET
-// LEDS
-#define LED_PIN 12
-#define NUM_LEDS 24
-#define BRIGHTNESS 64
-#define LED_TYPE WS2811
-#define COLOR_ORDER GRB
-CRGB leds[NUM_LEDS];
-
+  // LEDS
+  #define LED_PIN 12
+  #define NUM_LEDS 24
+  #define BRIGHTNESS 64
+  #define LED_TYPE WS2811
+  #define COLOR_ORDER GRB
+  CRGB leds[NUM_LEDS];
+  IRrecv irrx(IRRXPIN);
 #endif
 
 #ifdef GUN
   #define TRIGGER 4 // IR rx pin
+  IRsend irtx(IRTXPIN);
 #endif
 IPAddress messageTargetIP(192,168,2,2);
+int status = WL_IDLE_STATUS;
 const char* ssid = "BLASTO";
 const char* password = "Kanuckistan2016";
 char command[10]; // array to hold transmit message
 char response[10]; // array to hold recieve message
-
+byte packetBuffer[512]; // buffer to hold incoming and outgoing packets
 WiFiServer server(2016);
-WiFiClient wificlient[MAX_SRV_CLIENTS];
-IRsend irtx(IRTXPIN);
-IRrecv irrx(IRRXPIN);
+WiFiClient serverClients[MAX_SRV_CLIENTS];
+WiFiUDP Udp;
+IPAddress ipMulti(239,0,0,57);
+unsigned int portMulti = 2016; // local port to listen on
 
 // Gun definitions here..
 uint8_t safety = ON;
 int timeron = 0;
 unsigned long timerstart;
 unsigned long timerlength;
+uint16_t buf[8]; // buffer for IR message
 CRGB fgcolor, bgcolor;
 
 void setup() {
+  String chipID = String(system_get_chip_id(), HEX);
   #ifdef GUN
+    // create send packet
     pinMode(TRIGGER, INPUT_PULLUP); // led data pin wired to switch to GND.
     pinMode(SOLENOID, OUTPUT); // define solenoid as output possibly for vibration motor kickback
     digitalWrite(SOLENOID, 0); // and make false
     irtx.begin();
-    irrx.enableIRIn(); // enable receive on IR
+    //irrx.enableIRIn(); // enable receive on IR
+    
   #endif
   #ifdef TARGET
+    pinMode(SOLENOID, OUTPUT);
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
     FastLED.setBrightness(BRIGHTNESS);
     irrx.enableIRIn();
@@ -78,7 +87,6 @@ void setup() {
     pinMode(SOLENOID, OUTPUT);
   
   #endif
-  String chipID = String(system_get_chip_id(), HEX);
 
   
   Serial.begin(115200);
@@ -93,6 +101,11 @@ void setup() {
   Serial.println("WiFi connected");  
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+  Serial.print("UDP Multicast server started at: ");
+  Serial.print(ipMulti);
+  Serial.print(":");
+  Serial.println(portMulti);
+  Udp.beginMulticast(WiFi.localIP(), ipMulti, portMulti);
   server.begin();
   server.setNoDelay(true);
   Serial1.print("Ready! Use 'telnet ");
@@ -169,7 +182,7 @@ void update_timer() {
 
 
 void loop() {
-  int i;
+/*  uint8_t i;
   Serial.print(".");
 
   if (server.hasClient()){
@@ -180,11 +193,6 @@ void loop() {
         wificlient[i] = server.available();
         Serial.print("\nNew client: "); Serial.println(i);
         continue;
-        // receive data here
-        String receiveddata = wificlient[i].readStringUntil('\r');
-        // process receiveddata here
-        Serial.print("\nData:");
-        Serial.println(receiveddata);
       }
     }
     //no free/disconnected spot so reject
@@ -192,14 +200,61 @@ void loop() {
     serverClient.stop();
     Serial.println("No Free Clients - rejected");
   }
-
+  //check clients for data
+  for(i = 0; i < MAX_SRV_CLIENTS; i++){
+    if (wificlient[i] && wificlient[i].connected()){
+      if(wificlient[i].available()){
+        //get data from the telnet client and push it to the UART
+        while(wificlient[i].available()) Serial.write(wificlient[i].read());
+      }
+    }
+  }
+*/
+  uint8_t i;
+  //check if there are any new clients
+  if (server.hasClient()){
+    for(i = 0; i < MAX_SRV_CLIENTS; i++){
+      //find free/disconnected spot
+      if (!serverClients[i] || !serverClients[i].connected()){
+        if(serverClients[i]) serverClients[i].stop();
+        serverClients[i] = server.available();
+        Serial.print("New client: "); Serial.print(i);
+        continue;
+      }
+    }
+    //no free/disconnected spot so reject
+    WiFiClient serverClient = server.available();
+    serverClient.stop();
+  }
+  //check clients for data
+  for(i = 0; i < MAX_SRV_CLIENTS; i++){
+    if (serverClients[i] && serverClients[i].connected()){
+      if(serverClients[i].available()){
+        //get data from the telnet client and push it to the UART
+        while(serverClients[i].available()) Serial.write(serverClients[i].read());
+      }
+    }
+  }
+  //check UART for data
+  if(Serial.available()){
+    size_t len = Serial.available();
+    uint8_t sbuf[len];
+    Serial.readBytes(sbuf, len);
+    //push UART data to all connected telnet clients
+    for(i = 0; i < MAX_SRV_CLIENTS; i++){
+      if (serverClients[i] && serverClients[i].connected()){
+        serverClients[i].write(sbuf, len);
+        delay(1);
+      }
+    }
+  }
 #ifdef GUN
   if (!digitalRead(TRIGGER)) {     // trigger pulled
     Serial.println("\nTrigger pulled!");
     digitalWrite(SOLENOID, true); // Turn on Vibe
     delay(500);
     digitalWrite(SOLENOID, false); // turn off Vibe
-    
+    irtx.sendRaw("
     // send IP Packet
     // Send IR Pulse
     
@@ -274,7 +329,7 @@ void loop() {
 
 void sendCommand(IPAddress target, char* command)
 {
-  if (!wificlient[0].connect(target, TCPPORT)) {
+  if (!serverClients[0].connect(target, TCPPORT)) {
     Serial.print("Connection Failed");
     return;
   }
@@ -283,20 +338,20 @@ void sendCommand(IPAddress target, char* command)
    String url = String(system_get_chip_id(), HEX) + ":" + str(command) + "\r";
    // send request to server
    Serial.println();
-   wificlient[0].print(url);
+   serverClients[0].print(url);
    unsigned timeout = millis();
-   while (wificlient[0].available() == 0) {
+   while (serverClients[0].available() == 0) {
      if (millis() == timeout > 5000) {
        Serial.println("Client Timeout!");
-       wificlient[0].stop();
+       serverClients[0].stop();
        return;
      }
    }
    // read all data back
-   while (wificlient[0].available()) {
-    String received = wificlient[0].readStringUntil('\r');
+   while (serverClients[0].available()) {
+    String received = serverClients[0].readStringUntil('\r');
     Serial.print(received);
-    wificlient[0].stop();
+    serverClients[0].stop();
    }
 }
 
