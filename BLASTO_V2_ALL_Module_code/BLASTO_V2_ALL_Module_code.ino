@@ -63,11 +63,21 @@ uint8_t safety = ON;
 int timeron = 0;
 unsigned long timerstart;
 unsigned long timerlength;
-uint16_t buf[8]; // buffer for IR message
+uint16_t irbuf[8]; // buffer for IR message
 CRGB fgcolor, bgcolor;
 
+
+void packIRBuff() {
+  uint32_t myid = ESP.getChipId();
+  // pack the chip id into the first 4 bytes..
+  irbuf[0] = (myid & 0xFFFF0000UL) >> 16;
+  irbuf[1] = (myid & 0x0000FFFFUL);
+  
+}
 void setup() {
   String chipID = String(system_get_chip_id(), HEX);
+  packIRBuff();  
+  
   #ifdef GUN
     // create send packet
     pinMode(TRIGGER, INPUT_PULLUP); // led data pin wired to switch to GND.
@@ -75,7 +85,6 @@ void setup() {
     digitalWrite(SOLENOID, 0); // and make false
     irtx.begin();
     //irrx.enableIRIn(); // enable receive on IR
-    
   #endif
   #ifdef TARGET
     pinMode(SOLENOID, OUTPUT);
@@ -232,6 +241,7 @@ void loop() {
       if(serverClients[i].available()){
         //get data from the telnet client and push it to the UART
         while(serverClients[i].available()) Serial.write(serverClients[i].read());
+        
       }
     }
   }
@@ -250,13 +260,14 @@ void loop() {
   }
 #ifdef GUN
   if (!digitalRead(TRIGGER)) {     // trigger pulled
+
+    irtx.sendDISH(ESP.getChipId(), 32);
     Serial.println("\nTrigger pulled!");
     digitalWrite(SOLENOID, true); // Turn on Vibe
     delay(500);
     digitalWrite(SOLENOID, false); // turn off Vibe
-    irtx.sendRaw("
     // send IP Packet
-    // Send IR Pulse
+
     
   }
   
