@@ -188,37 +188,50 @@ void update_timer() {
 }
 #endif
 
-
+void sendUDPUnicast(IPAddress destination, String message) {
+  Udp.beginPacket(destination, portMulti);
+  Udp.print(ESP.getChipId(), HEX);
+  Udp.print(":");
+  Udp.print(WiFi.localIP());
+  Udp.print(":");
+  Udp.print(message);
+  Udp.endPacket();
+}
 
 void loop() {
-/*  uint8_t i;
-  Serial.print(".");
+  // check for UDP
+  int noBytes = Udp.parsePacket();
+  if (noBytes) {
+    Serial.print(millis() / 1000);
+    Serial.print(":Packet of ");
+    Serial.print(noBytes);
+    Serial.print(" received from ");
+    Serial.print(Udp.remoteIP());
+    Serial.print(":");
+    Serial.println(Udp.remotePort());
+    // We've received a packet, read the data from it
+    Udp.read(packetBuffer,noBytes); // read the packet into the buffer
 
-  if (server.hasClient()){
-    for(i = 0; i < MAX_SRV_CLIENTS; i++){
-      //find free/disconnected spot
-      if (!wificlient[i] || !wificlient[i].connected()){
-        if(wificlient[i]) wificlient[i].stop();
-        wificlient[i] = server.available();
-        Serial.print("\nNew client: "); Serial.println(i);
-        continue;
+    // display the packet contents in HEX
+    for (int i=1;i<=noBytes;i++){
+      Serial.print(packetBuffer[i-1],HEX);
+      if (i % 32 == 0){
+        Serial.println();
       }
-    }
-    //no free/disconnected spot so reject
-    WiFiClient serverClient = server.available();
-    serverClient.stop();
-    Serial.println("No Free Clients - rejected");
+      else Serial.print(' ');
+    } // end for
+    Serial.println();
+    Serial.println("Sendind packet now..");
+    // send a reply, to the IP address and port that sent us the packet we received
+//    Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+    Udp.beginPacket(ipMulti, portMulti);
+    Udp.write("ESP-");
+    Udp.print(ESP.getChipId(),HEX);
+    Udp.print(":");
+    Udp.print(WiFi.localIP());
+    Udp.endPacket(); //- See more at: http://www.esp8266.com/viewtopic.php?f=29&t=2464#sthash.EacJR4iq.dpuf
+
   }
-  //check clients for data
-  for(i = 0; i < MAX_SRV_CLIENTS; i++){
-    if (wificlient[i] && wificlient[i].connected()){
-      if(wificlient[i].available()){
-        //get data from the telnet client and push it to the UART
-        while(wificlient[i].available()) Serial.write(wificlient[i].read());
-      }
-    }
-  }
-*/
   uint8_t i;
   //check if there are any new clients
   if (server.hasClient()){
